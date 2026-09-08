@@ -1,0 +1,64 @@
+name: Build Clean Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            unzip zip git \
+            openjdk-17-jdk \
+            autoconf automake libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libtinfo6 cmake libffi-dev libssl-dev
+
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install buildozer cython
+
+      - name: Unpack project
+        run: |
+          rm -rf android_project
+          mkdir android_project
+
+          unzip -o ether_trials_android_clean_v6.zip -d android_project
+
+          echo "===== PROJECT FILES ====="
+          find android_project -maxdepth 2 -type f | sort | head -100
+
+          test -f android_project/buildozer.spec
+          test -f android_project/main.py
+          test -f android_project/game_core.py
+
+      - name: Build APK
+        working-directory: android_project
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          BUILDOZER_WARN_ON_ROOT: '0'
+        run: |
+          rm -rf .buildozer
+          yes | buildozer -v android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ether-Trials-Clean-v6-APK
+          path: android_project/bin/*.apk
+          if-no-files-found: error
+          retention-days: 30
